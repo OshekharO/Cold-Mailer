@@ -14,8 +14,8 @@ from email import encoders
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-SENDER_EMAIL = "your_email@gmail.com"        # CHANGE
-SENDER_PASSWORD = "your_app_password_here"   # CHANGE
+SENDER_EMAIL = "omeepd009@gmail.com"
+SENDER_PASSWORD = "hjzd yhjx fvgb yyte"
 # ===============================================
 
 email_list = []
@@ -42,6 +42,27 @@ Your Name
 I wanted to connect regarding potential opportunities.
 
 Kind regards,
+Your Name
+""",
+    "Follow Up": """Hello {name},
+
+I wanted to circle back on my previous email. Please let me know if you had a chance to review it.
+
+Thanks,
+Your Name
+""",
+    "Internship": """Hi {name},
+
+I am seeking internship opportunities and would love to contribute and learn from your team.
+
+Best,
+Your Name
+""",
+    "Freelance": """Hello {name},
+
+I provide freelance services and would be happy to help with your upcoming projects.
+
+Regards,
 Your Name
 """
 }
@@ -211,64 +232,146 @@ def send_emails():
 # ================= DARK MODE UI =================
 root = tk.Tk()
 root.title("Cold Mailer Pro")
-root.geometry("900x760")
-root.configure(bg="#1e1e1e")
+root.geometry("980x820")
 
-fg = "#ffffff"
-bg = "#1e1e1e"
-entry_bg = "#2d2d2d"
+fg = "#f5f5f5"
+bg = "#0f1115"
+surface = "#1c1f26"
+entry_bg = "#12151c"
+muted = "#b7bec9"
+accent = "#4fa8f4"
+accent_secondary = "#25c46f"
 
-def label(text):
-    return tk.Label(root, text=text, fg=fg, bg=bg)
+root.configure(bg=bg)
+root.option_add("*Font", ("Segoe UI", 10))
 
-label("Cold Mail Sender – Anti-Spam Enabled").pack(pady=10)
+style = ttk.Style()
+style.theme_use("default")
+style.configure(
+    "TProgressbar",
+    troughcolor="#0c0f14",
+    background=accent,
+    bordercolor=bg,
+    lightcolor=accent,
+    darkcolor=accent,
+)
 
-tk.Button(root, text="Load CSV", command=load_csv).pack()
-tk.Button(root, text="Add Attachment", command=select_attachment).pack(pady=4)
+header = tk.Label(
+    root,
+    text="Cold Mail Sender – Anti-Spam Enabled",
+    fg=fg,
+    bg=bg,
+    font=("Segoe UI Semibold", 18, "bold"),
+)
+header.pack(pady=(18, 2))
 
-label("Template").pack()
+subheader = tk.Label(
+    root,
+    text="Automated outreach with pacing, templates, and attachment support",
+    fg=muted,
+    bg=bg,
+    font=("Segoe UI", 10),
+)
+subheader.pack(pady=(0, 12))
+
+card = tk.Frame(
+    root,
+    bg=surface,
+    bd=0,
+    highlightbackground="#2a2f36",
+    highlightthickness=1,
+    padx=18,
+    pady=18,
+)
+card.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+def label(text, parent=None, **kwargs):
+    return tk.Label(parent or card, text=text, fg=fg, bg=surface, anchor="w", **kwargs)
+
+def action_button(parent, text, command, color=accent):
+    return tk.Button(
+        parent,
+        text=text,
+        command=command,
+        bg=color,
+        fg=fg,
+        activebackground=color,
+        activeforeground=fg,
+        relief="flat",
+        bd=0,
+        padx=14,
+        pady=8,
+        font=("Segoe UI", 10, "bold"),
+        cursor="hand2",
+    )
+
+top_actions = tk.Frame(card, bg=surface)
+top_actions.pack(fill=tk.X)
+
+action_button(top_actions, "Load CSV", load_csv).pack(side=tk.LEFT, padx=(0, 8))
+action_button(top_actions, "Add Attachment", select_attachment, color="#3b82f6").pack(side=tk.LEFT)
+
+label("Template").pack(pady=(14, 4), fill=tk.X)
 template_var = tk.StringVar(value="Entry Level")
-tk.OptionMenu(root, template_var, *TEMPLATES.keys()).pack()
-tk.Button(root, text="Apply Template", command=apply_template).pack(pady=4)
+template_dropdown = tk.OptionMenu(card, template_var, *TEMPLATES.keys())
+template_dropdown.config(bg=entry_bg, fg=fg, activebackground=entry_bg, activeforeground=fg, relief="flat")
+template_dropdown["menu"].config(bg=entry_bg, fg=fg, activebackground=accent, activeforeground=fg)
+template_dropdown.pack(fill=tk.X)
+action_button(card, "Apply Template", apply_template, color="#64748b").pack(pady=(6, 12), fill=tk.X)
 
-label("Subject").pack()
-subject_entry = tk.Entry(root, width=95, bg=entry_bg, fg=fg)
-subject_entry.pack()
+label("Subject").pack(pady=(4, 4), fill=tk.X)
+subject_entry = tk.Entry(card, width=95, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
+subject_entry.pack(fill=tk.X)
 
-label("Email Body ({name} supported)").pack()
-body_text = tk.Text(root, height=10, width=100, bg=entry_bg, fg=fg)
-body_text.pack()
+label("Email Body ({name} supported)").pack(pady=(10, 4), fill=tk.X)
+body_text = tk.Text(card, height=10, width=100, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
+body_text.pack(fill=tk.BOTH)
 
-label("Send Limit (≤200 recommended)").pack()
-limit_entry = tk.Entry(root, bg=entry_bg, fg=fg)
-limit_entry.pack()
+options_frame = tk.Frame(card, bg=surface)
+options_frame.pack(fill=tk.X, pady=(12, 4))
 
-label("Delay Between Emails (seconds)").pack()
-delay_entry = tk.Entry(root, bg=entry_bg, fg=fg)
+label("Send Limit (≤200 recommended)", parent=options_frame).grid(row=0, column=0, sticky="w")
+label("Delay Between Emails (seconds)", parent=options_frame).grid(row=0, column=1, sticky="w", padx=(18, 0))
+
+limit_entry = tk.Entry(options_frame, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
+limit_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
+
+delay_entry = tk.Entry(options_frame, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
 delay_entry.insert(0, "5")
-delay_entry.pack()
+delay_entry.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
 
-btn_frame = tk.Frame(root, bg=bg)
-btn_frame.pack(pady=10)
+options_frame.columnconfigure(0, weight=1)
+options_frame.columnconfigure(1, weight=1)
 
-tk.Button(btn_frame, text="SEND", bg="green", fg="white",
-          width=12, command=start_sending).grid(row=0, column=0, padx=5)
+btn_frame = tk.Frame(card, bg=surface)
+btn_frame.pack(pady=12, fill=tk.X)
 
-tk.Button(btn_frame, text="PAUSE", bg="orange",
-          width=12, command=pause_sending).grid(row=0, column=1, padx=5)
+action_button(btn_frame, "SEND", start_sending, color=accent_secondary).grid(row=0, column=0, padx=5, sticky="we")
+action_button(btn_frame, "PAUSE", pause_sending, color="#f59e0b").grid(row=0, column=1, padx=5, sticky="we")
+action_button(btn_frame, "RESUME", resume_sending, color="#3b82f6").grid(row=0, column=2, padx=5, sticky="we")
 
-tk.Button(btn_frame, text="RESUME", bg="#00aaff", fg="white",
-          width=12, command=resume_sending).grid(row=0, column=2, padx=5)
+btn_frame.columnconfigure(0, weight=1)
+btn_frame.columnconfigure(1, weight=1)
+btn_frame.columnconfigure(2, weight=1)
 
 # ---------- Progress Bar ----------
-progress_label = tk.Label(root, text="Progress: 0 / 0", fg=fg, bg=bg)
-progress_label.pack()
+progress_label = tk.Label(card, text="Progress: 0 / 0", fg=muted, bg=surface, anchor="w")
+progress_label.pack(fill=tk.X)
 
-progress = ttk.Progressbar(root, orient="horizontal", length=750, mode="determinate")
-progress.pack(pady=5)
+progress = ttk.Progressbar(card, orient="horizontal", length=750, mode="determinate")
+progress.pack(fill=tk.X, pady=6)
 
-log_box = tk.Text(root, height=12, bg="#111", fg="#00ff9c")
-log_box.pack(fill=tk.BOTH, padx=10, pady=10)
+log_box = tk.Text(card, height=12, bg="#0e1117", fg="#8afac9", relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
+log_box.pack(fill=tk.BOTH, padx=2, pady=(2, 0))
+
+footer = tk.Label(
+    root,
+    text="Developed By Saksham Shekher",
+    fg=muted,
+    bg=bg,
+    font=("Segoe UI", 9, "bold"),
+)
+footer.pack(pady=(6, 14))
 
 if __name__ == "__main__":
     root.mainloop()
