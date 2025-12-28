@@ -50,8 +50,10 @@ Your Name
 
 # ---------------- Utility ----------------
 def log(msg):
-    log_box.insert(tk.END, msg)
-    log_box.see(tk.END)
+    def _append():
+        log_box.insert(tk.END, msg)
+        log_box.see(tk.END)
+    root.after(0, _append)
 
 
 # ---------------- CSV ----------------
@@ -111,10 +113,13 @@ def update_progress():
 
 # ---------------- Sending ----------------
 def start_sending():
-    global sending
+    global sending, paused, current_index, total_emails
     if sending:
         messagebox.showinfo("Info", "Already sending")
         return
+    paused = False
+    current_index = 0
+    total_emails = 0
     threading.Thread(target=send_emails, daemon=True).start()
 
 
@@ -265,4 +270,5 @@ progress.pack(pady=5)
 log_box = tk.Text(root, height=12, bg="#111", fg="#00ff9c")
 log_box.pack(fill=tk.BOTH, padx=10, pady=10)
 
-root.mainloop()
+if __name__ == "__main__":
+    root.mainloop()
