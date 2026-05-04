@@ -9,10 +9,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import parseaddr
 
 # ================= SMTP CONFIG =================
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
+SMTP_TIMEOUT = 30  # seconds
 # ===============================================
 
 # ================= TEMPLATES ===================
@@ -107,9 +109,11 @@ class ColdMailerApp:
                 for row in csv.DictReader(f):
                     name = row.get("name", "").strip()
                     email = row.get("email", "").strip()
-                    # skip rows with missing or obviously invalid email
-                    if name and email and "@" in email and "." in email.split("@")[-1]:
-                        loaded.append({"name": name, "email": email})
+                    # skip rows with missing or structurally invalid email
+                    _, addr = parseaddr(email)
+                    local, _, domain = addr.partition("@")
+                    if name and local and domain and "." in domain and not domain.startswith("."):
+                        loaded.append({"name": name, "email": addr})
             self.email_list = loaded
             self.log(f"📄 Loaded {len(self.email_list)} contacts\n")
         except Exception as e:
@@ -184,7 +188,7 @@ class ColdMailerApp:
             limit_val = self.limit_entry.get().strip()
             delay_val = self.delay_entry.get().strip()
             limit = int(limit_val) if limit_val else len(self.email_list)
-            delay = max(1, int(delay_val) if delay_val else 5)  # minimum 1 s
+            delay = max(1, int(delay_val) if delay_val else 5)  # minimum 1 second
         except ValueError:
             self._dialog("error", "Error", "Limit & delay must be integers")
             return
@@ -199,7 +203,7 @@ class ColdMailerApp:
 
         server = None
         try:
-            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=SMTP_TIMEOUT)
             server.starttls()
             server.login(sender_email, sender_password)
 
