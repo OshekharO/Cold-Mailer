@@ -82,10 +82,12 @@ class ColdMailerApp:
     # ── Thread-safe helpers ───────────────────────────────────────────────────
 
     def log(self, msg: str) -> None:
-        """Append a line to the log widget from any thread."""
+        """Append a line to the read-only log widget from any thread."""
         def _append():
+            self.log_box.config(state=tk.NORMAL)
             self.log_box.insert(tk.END, msg)
             self.log_box.see(tk.END)
+            self.log_box.config(state=tk.DISABLED)
         self.root.after(0, _append)
 
     def _dialog(self, kind: str, title: str, msg: str) -> None:
@@ -136,10 +138,14 @@ class ColdMailerApp:
     # ── Pause / Resume ────────────────────────────────────────────────────────
 
     def pause_sending(self) -> None:
+        if not self.sending:
+            return
         self._pause_event.clear()
         self.log("⏸ Sending paused\n")
 
     def resume_sending(self) -> None:
+        if not self.sending:
+            return
         self._pause_event.set()
         self.log("▶ Sending resumed\n")
 
