@@ -149,6 +149,11 @@ class ColdMailerApp:
         self._pause_event.set()
         self.log("▶ Sending resumed\n")
 
+    def _clear_log(self) -> None:
+        self.log_box.config(state=tk.NORMAL)
+        self.log_box.delete("1.0", tk.END)
+        self.log_box.config(state=tk.DISABLED)
+
     # ── Progress ─────────────────────────────────────────────────────────────
 
     def _update_progress(self) -> None:
@@ -208,6 +213,7 @@ class ColdMailerApp:
             self.sending = True
 
         server = None
+        completed = False
         try:
             server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=SMTP_TIMEOUT)
             server.starttls()
@@ -255,6 +261,8 @@ class ColdMailerApp:
                 if self.current_index < self.total_emails:
                     time.sleep(delay)
 
+            completed = True
+
         except smtplib.SMTPAuthenticationError:
             self._dialog(
                 "error",
@@ -272,8 +280,9 @@ class ColdMailerApp:
             with self._lock:
                 self.sending = False
             self.root.after(0, self._reset_progress)
-            self.log("✅ All emails processed\n")
-            self._dialog("info", "Completed", "Email sending finished")
+            if completed:
+                self.log("✅ All emails processed\n")
+                self._dialog("info", "Completed", "Email sending finished")
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -292,6 +301,7 @@ class ColdMailerApp:
 
         root.configure(bg=bg)
         root.option_add("*Font", ("Segoe UI", 10))
+        root.minsize(760, 740)
 
         style = ttk.Style()
         style.theme_use("default")
@@ -403,12 +413,18 @@ class ColdMailerApp:
 
         # ── Body ─────────────────────────────────────────────────────────────
         lbl("Email Body ({name} supported)").pack(pady=(10, 4), fill=tk.X)
+        body_frame = tk.Frame(card, bg=entry_bg, highlightthickness=1, highlightbackground="#2f3440")
+        body_frame.pack(fill=tk.BOTH)
+        body_scroll = tk.Scrollbar(body_frame, bg=surface, troughcolor=entry_bg, relief="flat", bd=0)
+        body_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.body_text = tk.Text(
-            card, height=10, width=100,
+            body_frame, height=10, width=100,
             bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+            insertbackground=fg, highlightthickness=0,
+            yscrollcommand=body_scroll.set,
         )
-        self.body_text.pack(fill=tk.BOTH)
+        self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        body_scroll.config(command=self.body_text.yview)
 
         # ── Options ──────────────────────────────────────────────────────────
         options_frame = tk.Frame(card, bg=surface)
@@ -448,19 +464,29 @@ class ColdMailerApp:
         btn_frame.columnconfigure(2, weight=1)
 
         # ── Progress bar ──────────────────────────────────────────────────────
-        self.progress_label = tk.Label(card, text="Progress: 0 / 0", fg=muted, bg=surface, anchor="w")
-        self.progress_label.pack(fill=tk.X)
+        prog_header = tk.Frame(card, bg=surface)
+        prog_header.pack(fill=tk.X)
+        self.progress_label = tk.Label(prog_header, text="Progress: 0 / 0", fg=muted, bg=surface, anchor="w")
+        self.progress_label.pack(side=tk.LEFT)
+        btn(prog_header, "Clear Log", self._clear_log, color="#374151").pack(side=tk.RIGHT)
 
         self.progress = ttk.Progressbar(card, orient="horizontal", length=750, mode="determinate")
         self.progress.pack(fill=tk.X, pady=6)
 
         # ── Log ───────────────────────────────────────────────────────────────
+        log_frame = tk.Frame(card, bg="#0e1117", highlightthickness=1, highlightbackground="#2f3440")
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=(2, 0))
+        log_scroll = tk.Scrollbar(log_frame, bg=surface, troughcolor="#0e1117", relief="flat", bd=0)
+        log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.log_box = tk.Text(
-            card, height=12,
+            log_frame, height=12,
             bg="#0e1117", fg="#8afac9", relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+            insertbackground=fg, highlightthickness=0,
+            state=tk.DISABLED,
+            yscrollcommand=log_scroll.set,
         )
-        self.log_box.pack(fill=tk.BOTH, padx=2, pady=(2, 0))
+        self.log_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        log_scroll.config(command=self.log_box.yview)
 
         tk.Label(
             root,
