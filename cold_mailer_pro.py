@@ -13,18 +13,7 @@ from email import encoders
 # ================= SMTP CONFIG =================
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-
-SENDER_EMAIL = "omeepd009@gmail.com"
-SENDER_PASSWORD = "hjzd yhjx fvgb yyte"
 # ===============================================
-
-email_list = []
-attachment_path = None
-
-paused = False
-sending = False
-current_index = 0
-total_emails = 0
 
 # ================= TEMPLATES ===================
 TEMPLATES = {
@@ -64,314 +53,419 @@ I provide freelance services and would be happy to help with your upcoming proje
 
 Regards,
 Your Name
-"""
+""",
 }
 # ===============================================
 
 
-# ---------------- Utility ----------------
-def log(msg):
-    def _append():
-        log_box.insert(tk.END, msg)
-        log_box.see(tk.END)
-    root.after(0, _append)
+class ColdMailerApp:
+    """Main application class – keeps all state and UI widgets encapsulated."""
 
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        self.email_list: list = []
+        self.attachment_path: str | None = None
 
-# ---------------- CSV ----------------
-def load_csv():
-    email_list.clear()
-    path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
-    if not path:
-        return
-    try:
-        with open(path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if "name" in row and "email" in row:
-                    email_list.append({
-                        "name": row["name"].strip(),
-                        "email": row["email"].strip()
-                    })
-        log(f"📄 Loaded {len(email_list)} contacts\n")
-    except Exception as e:
-        messagebox.showerror("CSV Error", str(e))
+        # threading.Event lets pause/resume work without busy-waiting
+        self._pause_event = threading.Event()
+        self._pause_event.set()  # set = not paused
 
+        self._lock = threading.Lock()
+        self.sending = False
+        self.current_index = 0
+        self.total_emails = 0
 
-# ---------------- Attachment ----------------
-def select_attachment():
-    global attachment_path
-    attachment_path = filedialog.askopenfilename()
-    if attachment_path:
-        log(f"📎 Attachment: {os.path.basename(attachment_path)}\n")
+        self._build_ui()
 
+    # ── Thread-safe helpers ───────────────────────────────────────────────────
 
-# ---------------- Template ----------------
-def apply_template():
-    body_text.delete("1.0", tk.END)
-    body_text.insert(tk.END, TEMPLATES[template_var.get()])
+    def log(self, msg: str) -> None:
+        """Append a line to the log widget from any thread."""
+        def _append():
+            self.log_box.insert(tk.END, msg)
+            self.log_box.see(tk.END)
+        self.root.after(0, _append)
 
+    def _dialog(self, kind: str, title: str, msg: str) -> None:
+        """Show a messagebox safely from a background thread."""
+        fn = {
+            "error": messagebox.showerror,
+            "warning": messagebox.showwarning,
+            "info": messagebox.showinfo,
+        }[kind]
+        self.root.after(0, lambda: fn(title, msg))
 
-# ---------------- Pause / Resume ----------------
-def pause_sending():
-    global paused
-    paused = True
-    log("⏸ Sending paused\n")
+    # ── CSV ──────────────────────────────────────────────────────────────────
 
+    def load_csv(self) -> None:
+        path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
+        if not path:
+            return
+        try:
+            loaded = []
+            with open(path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    name = row.get("name", "").strip()
+                    email = row.get("email", "").strip()
+                    # skip rows with missing or obviously invalid email
+                    if name and email and "@" in email and "." in email.split("@")[-1]:
+                        loaded.append({"name": name, "email": email})
+            self.email_list = loaded
+            self.log(f"📄 Loaded {len(self.email_list)} contacts\n")
+        except Exception as e:
+            messagebox.showerror("CSV Error", str(e))
 
-def resume_sending():
-    global paused
-    paused = False
-    log("▶ Sending resumed\n")
+    # ── Attachment ────────────────────────────────────────────────────────────
 
+    def select_attachment(self) -> None:
+        path = filedialog.askopenfilename()
+        if path:
+            self.attachment_path = path
+            self.log(f"📎 Attachment: {os.path.basename(path)}\n")
 
-# ---------------- Progress ----------------
-def update_progress():
-    progress["value"] = current_index
-    progress_label.config(
-        text=f"Progress: {current_index} / {total_emails}"
-    )
+    # ── Template ─────────────────────────────────────────────────────────────
 
+    def apply_template(self) -> None:
+        self.body_text.delete("1.0", tk.END)
+        self.body_text.insert(tk.END, TEMPLATES[self.template_var.get()])
 
-# ---------------- Sending ----------------
-def start_sending():
-    global sending, paused, current_index, total_emails
-    if sending:
-        messagebox.showinfo("Info", "Already sending")
-        return
-    paused = False
-    current_index = 0
-    total_emails = 0
-    threading.Thread(target=send_emails, daemon=True).start()
+    # ── Pause / Resume ────────────────────────────────────────────────────────
 
+    def pause_sending(self) -> None:
+        self._pause_event.clear()
+        self.log("⏸ Sending paused\n")
 
-def send_emails():
-    global paused, sending, current_index, total_emails
+    def resume_sending(self) -> None:
+        self._pause_event.set()
+        self.log("▶ Sending resumed\n")
 
-    if not email_list:
-        messagebox.showwarning("No Data", "Load CSV first")
-        return
+    # ── Progress ─────────────────────────────────────────────────────────────
 
-    subject = subject_entry.get().strip()
-    body = body_text.get("1.0", tk.END).strip()
+    def _update_progress(self) -> None:
+        self.progress["value"] = self.current_index
+        self.progress_label.config(
+            text=f"Progress: {self.current_index} / {self.total_emails}"
+        )
 
-    if not subject or not body:
-        messagebox.showwarning("Missing", "Subject and body required")
-        return
+    def _reset_progress(self) -> None:
+        self.progress.config(value=0)
+        self.progress_label.config(text="Progress: 0 / 0")
 
-    try:
-        limit = int(limit_entry.get()) if limit_entry.get() else len(email_list)
-        delay = int(delay_entry.get()) if delay_entry.get() else 5
-    except ValueError:
-        messagebox.showerror("Error", "Limit & delay must be numbers")
-        return
+    # ── Sending ───────────────────────────────────────────────────────────────
 
-    recipients = email_list[:limit]
-    total_emails = len(recipients)
+    def start_sending(self) -> None:
+        with self._lock:
+            if self.sending:
+                messagebox.showinfo("Info", "Already sending")
+                return
+        self._pause_event.set()
+        self.current_index = 0
+        threading.Thread(target=self._send_emails, daemon=True).start()
 
-    root.after(0, lambda: progress.config(maximum=total_emails, value=current_index))
-    root.after(0, update_progress)
+    def _send_emails(self) -> None:
+        if not self.email_list:
+            self._dialog("warning", "No Data", "Load CSV first")
+            return
 
-    sending = True
+        subject = self.subject_entry.get().strip()
+        body = self.body_text.get("1.0", tk.END).strip()
+        sender_email = self.email_entry.get().strip()
+        sender_password = self.password_entry.get().strip()
 
-    try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-    except Exception as e:
-        sending = False
-        messagebox.showerror("SMTP Error", str(e))
-        return
+        if not sender_email or not sender_password:
+            self._dialog("warning", "Missing", "Enter sender email and app password")
+            return
 
-    while current_index < total_emails:
-        if paused:
-            time.sleep(1)
-            continue
-
-        person = recipients[current_index]
+        if not subject or not body:
+            self._dialog("warning", "Missing", "Subject and body required")
+            return
 
         try:
-            msg = MIMEMultipart()
-            msg["From"] = SENDER_EMAIL
-            msg["To"] = person["email"]
-            msg["Subject"] = subject
+            limit_val = self.limit_entry.get().strip()
+            delay_val = self.delay_entry.get().strip()
+            limit = int(limit_val) if limit_val else len(self.email_list)
+            delay = max(1, int(delay_val) if delay_val else 5)  # minimum 1 s
+        except ValueError:
+            self._dialog("error", "Error", "Limit & delay must be integers")
+            return
 
-            msg.attach(MIMEText(body.format(name=person["name"]), "plain"))
+        recipients = self.email_list[:limit]
+        self.total_emails = len(recipients)
+        self.root.after(0, lambda: self.progress.config(maximum=self.total_emails, value=0))
+        self.root.after(0, self._update_progress)
 
-            if attachment_path:
-                with open(attachment_path, "rb") as f:
-                    part = MIMEBase("application", "octet-stream")
-                    part.set_payload(f.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    "Content-Disposition",
-                    f'attachment; filename="{os.path.basename(attachment_path)}"'
-                )
-                msg.attach(part)
+        with self._lock:
+            self.sending = True
 
-            server.sendmail(SENDER_EMAIL, person["email"], msg.as_string())
-            log(f"✔ Sent to {person['email']}\n")
+        server = None
+        try:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=30)
+            server.starttls()
+            server.login(sender_email, sender_password)
 
+            while self.current_index < self.total_emails:
+                self._pause_event.wait()  # blocks efficiently while paused
+
+                person = recipients[self.current_index]
+                try:
+                    msg = MIMEMultipart()
+                    msg["From"] = sender_email
+                    msg["To"] = person["email"]
+                    msg["Subject"] = subject
+
+                    try:
+                        personalized_body = body.format(name=person["name"])
+                    except (KeyError, ValueError):
+                        personalized_body = body
+
+                    msg.attach(MIMEText(personalized_body, "plain"))
+
+                    if self.attachment_path:
+                        with open(self.attachment_path, "rb") as f:
+                            part = MIMEBase("application", "octet-stream")
+                            part.set_payload(f.read())
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            "Content-Disposition",
+                            f'attachment; filename="{os.path.basename(self.attachment_path)}"',
+                        )
+                        msg.attach(part)
+
+                    server.sendmail(sender_email, person["email"], msg.as_string())
+                    self.log(f"✔ Sent to {person['email']}\n")
+
+                except smtplib.SMTPException as smtp_err:
+                    self.log(f"✖ Failed {person['email']} | {smtp_err}\n")
+                except Exception as e:
+                    self.log(f"✖ Failed {person['email']} | {e}\n")
+
+                self.current_index += 1
+                self.root.after(0, self._update_progress)
+
+                if self.current_index < self.total_emails:
+                    time.sleep(delay)
+
+        except smtplib.SMTPAuthenticationError:
+            self._dialog(
+                "error",
+                "Auth Error",
+                "Invalid email or app password.\nFor Gmail, use a 16-character App Password.",
+            )
         except Exception as e:
-            log(f"✖ Failed {person['email']} | {e}\n")
+            self._dialog("error", "SMTP Error", str(e))
+        finally:
+            if server:
+                try:
+                    server.quit()
+                except Exception:
+                    pass
+            with self._lock:
+                self.sending = False
+            self.root.after(0, self._reset_progress)
+            self.log("✅ All emails processed\n")
+            self._dialog("info", "Completed", "Email sending finished")
 
-        current_index += 1
-        root.after(0, update_progress)
-        time.sleep(delay)
+    # ── UI ────────────────────────────────────────────────────────────────────
 
-    server.quit()
-    sending = False
-    current_index = 0
+    def _build_ui(self) -> None:
+        root = self.root
+        root.title("Cold Mailer Pro")
+        root.geometry("980x920")
 
-    root.after(0, lambda: progress.config(value=0))
-    root.after(0, lambda: progress_label.config(text="Progress: 0 / 0"))
+        fg = "#f5f5f5"
+        bg = "#0f1115"
+        surface = "#1c1f26"
+        entry_bg = "#12151c"
+        muted = "#b7bec9"
+        accent = "#4fa8f4"
+        accent_secondary = "#25c46f"
 
-    log("✅ All emails processed\n")
-    messagebox.showinfo("Completed", "Email sending finished")
+        root.configure(bg=bg)
+        root.option_add("*Font", ("Segoe UI", 10))
+
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure(
+            "TProgressbar",
+            troughcolor="#0c0f14",
+            background=accent,
+            bordercolor=bg,
+            lightcolor=accent,
+            darkcolor=accent,
+        )
+
+        tk.Label(
+            root,
+            text="Cold Mail Sender – Anti-Spam Enabled",
+            fg=fg,
+            bg=bg,
+            font=("Segoe UI Semibold", 18, "bold"),
+        ).pack(pady=(18, 2))
+
+        tk.Label(
+            root,
+            text="Automated outreach with pacing, templates, and attachment support",
+            fg=muted,
+            bg=bg,
+            font=("Segoe UI", 10),
+        ).pack(pady=(0, 12))
+
+        card = tk.Frame(
+            root,
+            bg=surface,
+            bd=0,
+            highlightbackground="#2a2f36",
+            highlightthickness=1,
+            padx=18,
+            pady=18,
+        )
+        card.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        def lbl(text, parent=None, **kw):
+            return tk.Label(parent or card, text=text, fg=fg, bg=surface, anchor="w", **kw)
+
+        def btn(parent, text, command, color=accent):
+            return tk.Button(
+                parent,
+                text=text,
+                command=command,
+                bg=color,
+                fg=fg,
+                activebackground=color,
+                activeforeground=fg,
+                relief="flat",
+                bd=0,
+                padx=14,
+                pady=8,
+                font=("Segoe UI", 10, "bold"),
+                cursor="hand2",
+            )
+
+        # ── Credentials ──────────────────────────────────────────────────────
+        creds_frame = tk.Frame(card, bg=surface)
+        creds_frame.pack(fill=tk.X, pady=(0, 10))
+
+        lbl("Sender Email", parent=creds_frame).grid(row=0, column=0, sticky="w")
+        lbl("App Password", parent=creds_frame).grid(row=0, column=1, sticky="w", padx=(18, 0))
+
+        self.email_entry = tk.Entry(
+            creds_frame,
+            bg=entry_bg, fg=fg, relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        )
+        self.email_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
+
+        self.password_entry = tk.Entry(
+            creds_frame,
+            bg=entry_bg, fg=fg, relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+            show="•",
+        )
+        self.password_entry.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
+
+        creds_frame.columnconfigure(0, weight=1)
+        creds_frame.columnconfigure(1, weight=1)
+
+        # ── CSV / Attachment ─────────────────────────────────────────────────
+        top_actions = tk.Frame(card, bg=surface)
+        top_actions.pack(fill=tk.X)
+
+        btn(top_actions, "Load CSV", self.load_csv).pack(side=tk.LEFT, padx=(0, 8))
+        btn(top_actions, "Add Attachment", self.select_attachment, color="#3b82f6").pack(side=tk.LEFT)
+
+        # ── Template ─────────────────────────────────────────────────────────
+        lbl("Template").pack(pady=(14, 4), fill=tk.X)
+        self.template_var = tk.StringVar(value="Entry Level")
+        dropdown = tk.OptionMenu(card, self.template_var, *TEMPLATES.keys())
+        dropdown.config(bg=entry_bg, fg=fg, activebackground=entry_bg, activeforeground=fg, relief="flat")
+        dropdown["menu"].config(bg=entry_bg, fg=fg, activebackground=accent, activeforeground=fg)
+        dropdown.pack(fill=tk.X)
+        btn(card, "Apply Template", self.apply_template, color="#64748b").pack(pady=(6, 12), fill=tk.X)
+
+        # ── Subject ──────────────────────────────────────────────────────────
+        lbl("Subject").pack(pady=(4, 4), fill=tk.X)
+        self.subject_entry = tk.Entry(
+            card, width=95,
+            bg=entry_bg, fg=fg, relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        )
+        self.subject_entry.pack(fill=tk.X)
+
+        # ── Body ─────────────────────────────────────────────────────────────
+        lbl("Email Body ({name} supported)").pack(pady=(10, 4), fill=tk.X)
+        self.body_text = tk.Text(
+            card, height=10, width=100,
+            bg=entry_bg, fg=fg, relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        )
+        self.body_text.pack(fill=tk.BOTH)
+
+        # ── Options ──────────────────────────────────────────────────────────
+        options_frame = tk.Frame(card, bg=surface)
+        options_frame.pack(fill=tk.X, pady=(12, 4))
+
+        lbl("Send Limit (≤200 recommended)", parent=options_frame).grid(row=0, column=0, sticky="w")
+        lbl("Delay Between Emails (seconds, min 1)", parent=options_frame).grid(row=0, column=1, sticky="w", padx=(18, 0))
+
+        self.limit_entry = tk.Entry(
+            options_frame,
+            bg=entry_bg, fg=fg, relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        )
+        self.limit_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
+
+        self.delay_entry = tk.Entry(
+            options_frame,
+            bg=entry_bg, fg=fg, relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        )
+        self.delay_entry.insert(0, "5")
+        self.delay_entry.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
+
+        options_frame.columnconfigure(0, weight=1)
+        options_frame.columnconfigure(1, weight=1)
+
+        # ── Action buttons ────────────────────────────────────────────────────
+        btn_frame = tk.Frame(card, bg=surface)
+        btn_frame.pack(pady=12, fill=tk.X)
+
+        btn(btn_frame, "SEND", self.start_sending, color=accent_secondary).grid(row=0, column=0, padx=5, sticky="we")
+        btn(btn_frame, "PAUSE", self.pause_sending, color="#f59e0b").grid(row=0, column=1, padx=5, sticky="we")
+        btn(btn_frame, "RESUME", self.resume_sending, color="#3b82f6").grid(row=0, column=2, padx=5, sticky="we")
+
+        btn_frame.columnconfigure(0, weight=1)
+        btn_frame.columnconfigure(1, weight=1)
+        btn_frame.columnconfigure(2, weight=1)
+
+        # ── Progress bar ──────────────────────────────────────────────────────
+        self.progress_label = tk.Label(card, text="Progress: 0 / 0", fg=muted, bg=surface, anchor="w")
+        self.progress_label.pack(fill=tk.X)
+
+        self.progress = ttk.Progressbar(card, orient="horizontal", length=750, mode="determinate")
+        self.progress.pack(fill=tk.X, pady=6)
+
+        # ── Log ───────────────────────────────────────────────────────────────
+        self.log_box = tk.Text(
+            card, height=12,
+            bg="#0e1117", fg="#8afac9", relief="flat",
+            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        )
+        self.log_box.pack(fill=tk.BOTH, padx=2, pady=(2, 0))
+
+        tk.Label(
+            root,
+            text="Developed By Saksham Shekher",
+            fg=muted,
+            bg=bg,
+            font=("Segoe UI", 9, "bold"),
+        ).pack(pady=(6, 14))
 
 
-# ================= DARK MODE UI =================
-root = tk.Tk()
-root.title("Cold Mailer Pro")
-root.geometry("980x820")
+def main() -> None:
+    root = tk.Tk()
+    ColdMailerApp(root)
+    root.mainloop()
 
-fg = "#f5f5f5"
-bg = "#0f1115"
-surface = "#1c1f26"
-entry_bg = "#12151c"
-muted = "#b7bec9"
-accent = "#4fa8f4"
-accent_secondary = "#25c46f"
-
-root.configure(bg=bg)
-root.option_add("*Font", ("Segoe UI", 10))
-
-style = ttk.Style()
-style.theme_use("default")
-style.configure(
-    "TProgressbar",
-    troughcolor="#0c0f14",
-    background=accent,
-    bordercolor=bg,
-    lightcolor=accent,
-    darkcolor=accent,
-)
-
-header = tk.Label(
-    root,
-    text="Cold Mail Sender – Anti-Spam Enabled",
-    fg=fg,
-    bg=bg,
-    font=("Segoe UI Semibold", 18, "bold"),
-)
-header.pack(pady=(18, 2))
-
-subheader = tk.Label(
-    root,
-    text="Automated outreach with pacing, templates, and attachment support",
-    fg=muted,
-    bg=bg,
-    font=("Segoe UI", 10),
-)
-subheader.pack(pady=(0, 12))
-
-card = tk.Frame(
-    root,
-    bg=surface,
-    bd=0,
-    highlightbackground="#2a2f36",
-    highlightthickness=1,
-    padx=18,
-    pady=18,
-)
-card.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-def label(text, parent=None, **kwargs):
-    return tk.Label(parent or card, text=text, fg=fg, bg=surface, anchor="w", **kwargs)
-
-def action_button(parent, text, command, color=accent):
-    return tk.Button(
-        parent,
-        text=text,
-        command=command,
-        bg=color,
-        fg=fg,
-        activebackground=color,
-        activeforeground=fg,
-        relief="flat",
-        bd=0,
-        padx=14,
-        pady=8,
-        font=("Segoe UI", 10, "bold"),
-        cursor="hand2",
-    )
-
-top_actions = tk.Frame(card, bg=surface)
-top_actions.pack(fill=tk.X)
-
-action_button(top_actions, "Load CSV", load_csv).pack(side=tk.LEFT, padx=(0, 8))
-action_button(top_actions, "Add Attachment", select_attachment, color="#3b82f6").pack(side=tk.LEFT)
-
-label("Template").pack(pady=(14, 4), fill=tk.X)
-template_var = tk.StringVar(value="Entry Level")
-template_dropdown = tk.OptionMenu(card, template_var, *TEMPLATES.keys())
-template_dropdown.config(bg=entry_bg, fg=fg, activebackground=entry_bg, activeforeground=fg, relief="flat")
-template_dropdown["menu"].config(bg=entry_bg, fg=fg, activebackground=accent, activeforeground=fg)
-template_dropdown.pack(fill=tk.X)
-action_button(card, "Apply Template", apply_template, color="#64748b").pack(pady=(6, 12), fill=tk.X)
-
-label("Subject").pack(pady=(4, 4), fill=tk.X)
-subject_entry = tk.Entry(card, width=95, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
-subject_entry.pack(fill=tk.X)
-
-label("Email Body ({name} supported)").pack(pady=(10, 4), fill=tk.X)
-body_text = tk.Text(card, height=10, width=100, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
-body_text.pack(fill=tk.BOTH)
-
-options_frame = tk.Frame(card, bg=surface)
-options_frame.pack(fill=tk.X, pady=(12, 4))
-
-label("Send Limit (≤200 recommended)", parent=options_frame).grid(row=0, column=0, sticky="w")
-label("Delay Between Emails (seconds)", parent=options_frame).grid(row=0, column=1, sticky="w", padx=(18, 0))
-
-limit_entry = tk.Entry(options_frame, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
-limit_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
-
-delay_entry = tk.Entry(options_frame, bg=entry_bg, fg=fg, relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
-delay_entry.insert(0, "5")
-delay_entry.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
-
-options_frame.columnconfigure(0, weight=1)
-options_frame.columnconfigure(1, weight=1)
-
-btn_frame = tk.Frame(card, bg=surface)
-btn_frame.pack(pady=12, fill=tk.X)
-
-action_button(btn_frame, "SEND", start_sending, color=accent_secondary).grid(row=0, column=0, padx=5, sticky="we")
-action_button(btn_frame, "PAUSE", pause_sending, color="#f59e0b").grid(row=0, column=1, padx=5, sticky="we")
-action_button(btn_frame, "RESUME", resume_sending, color="#3b82f6").grid(row=0, column=2, padx=5, sticky="we")
-
-btn_frame.columnconfigure(0, weight=1)
-btn_frame.columnconfigure(1, weight=1)
-btn_frame.columnconfigure(2, weight=1)
-
-# ---------- Progress Bar ----------
-progress_label = tk.Label(card, text="Progress: 0 / 0", fg=muted, bg=surface, anchor="w")
-progress_label.pack(fill=tk.X)
-
-progress = ttk.Progressbar(card, orient="horizontal", length=750, mode="determinate")
-progress.pack(fill=tk.X, pady=6)
-
-log_box = tk.Text(card, height=12, bg="#0e1117", fg="#8afac9", relief="flat", insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440")
-log_box.pack(fill=tk.BOTH, padx=2, pady=(2, 0))
-
-footer = tk.Label(
-    root,
-    text="Developed By Saksham Shekher",
-    fg=muted,
-    bg=bg,
-    font=("Segoe UI", 9, "bold"),
-)
-footer.pack(pady=(6, 14))
 
 if __name__ == "__main__":
-    root.mainloop()
+    main()
