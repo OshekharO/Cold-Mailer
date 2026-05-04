@@ -19,42 +19,107 @@ SMTP_TIMEOUT = 30  # seconds
 
 # ================= TEMPLATES ===================
 TEMPLATES = {
-    "Entry Level": """Hi {name},
+    "Entry Level": """\
+Hi {name},
 
-I hope this email finds you well.
+I hope this message finds you well.
 
-I am reaching out to explore entry-level opportunities at your organization.
+I recently came across your company and was genuinely impressed by the work your team is doing. As a motivated graduate with a strong foundation in [Your Field], I'm excited to bring fresh energy and a growth mindset to an entry-level role.
+
+A few things I offer:
+  • Solid understanding of [Skill 1] and [Skill 2]
+  • Quick learner with a collaborative, team-first attitude
+  • Passion for delivering quality work from day one
+
+I'd love the opportunity to explore how I could contribute to your organisation. Would you be open to a brief 15-minute chat this week?
+
+I've attached my resume for your reference — thank you so much for your time.
+
+Warm regards,
+[Your Name]
+[LinkedIn] | [Portfolio / GitHub]
+""",
+
+    "General Cold Mail": """\
+Hello {name},
+
+I hope you're having a great week.
+
+I'm reaching out because I believe there's a genuine fit between my background in [Your Field] and the direction your team is heading. Over the past [X] years I've built expertise in [Key Skill], and I'm actively exploring my next opportunity where I can make a real impact.
+
+Career highlights:
+  • [Achievement or project — one compelling line]
+  • [Achievement or project — one compelling line]
+  • [Achievement or project — one compelling line]
+
+I'm not just sending out mass applications — your company specifically caught my attention because of [reason: product / mission / culture]. I'd love to learn more about your team and share how I might add value.
+
+Would you be open to a quick 10-minute call at your convenience?
 
 Best regards,
-Your Name
+[Your Name]
+[Email] | [LinkedIn] | [Portfolio]
 """,
-    "General Cold Mail": """Hello {name},
 
-I wanted to connect regarding potential opportunities.
+    "Follow Up": """\
+Hello {name},
 
-Kind regards,
-Your Name
-""",
-    "Follow Up": """Hello {name},
+I wanted to follow up on my message from last week — I know how busy inboxes get, and I didn't want mine to slip through the cracks.
 
-I wanted to circle back on my previous email. Please let me know if you had a chance to review it.
+I remain genuinely enthusiastic about the possibility of contributing to your team at [Company Name]. If now isn't the right time, I completely understand — I'd love to stay on your radar for future openings.
 
-Thanks,
-Your Name
-""",
-    "Internship": """Hi {name},
+To make it easy, here's a quick summary of what I bring:
+  • [Core strength or skill]
+  • [Relevant experience or achievement]
+  • [What makes you stand out]
 
-I am seeking internship opportunities and would love to contribute and learn from your team.
+I'm happy to share my portfolio, resume, or any additional information at your convenience. Even a 10-minute call would mean a lot.
+
+Thank you again for your time — I look forward to hearing from you.
 
 Best,
-Your Name
+[Your Name]
+[LinkedIn] | [Portfolio]
 """,
-    "Freelance": """Hello {name},
 
-I provide freelance services and would be happy to help with your upcoming projects.
+    "Internship": """\
+Hi {name},
+
+I'm a [Year] student pursuing [Degree] at [University], and I'm looking to gain meaningful hands-on experience through an internship this [Season / Year].
+
+Your company immediately stood out to me because of [specific reason — product, culture, mission, or recent news]. I'm not just looking for a line on my resume — I want to roll up my sleeves and contribute to real work.
+
+What I bring:
+  • Coursework and projects in [Relevant Area]
+  • Hands-on familiarity with [Tools / Tech / Languages]
+  • Strong drive to learn fast, communicate clearly, and deliver results
+
+I'd love to explore whether there's a fit. Could we schedule a quick 15-minute call to discuss any upcoming internship openings?
+
+Thank you so much for taking the time to read this.
+
+Best,
+[Your Name]
+[University] | [LinkedIn] | [GitHub / Portfolio]
+""",
+
+    "Freelance": """\
+Hello {name},
+
+I'm a freelance [Your Specialty — e.g., full-stack developer / UI designer / content writer] with [X]+ years of experience helping businesses like yours achieve [specific outcome — e.g., faster product delivery / higher conversion rates / stronger brand presence].
+
+A few recent highlights:
+  • [Client / Project]: [Brief, specific result — e.g., reduced load time by 40%]
+  • [Client / Project]: [Brief, specific result]
+  • [Client / Project]: [Brief, specific result]
+
+I specialise in [Your Niche] and I'm selective about the projects I take on — which means the clients I work with get my full focus and best work.
+
+I'd love to understand your upcoming needs and explore how I can help. Would you be open to a no-commitment 20-minute discovery call this week?
 
 Regards,
-Your Name
+[Your Name]
+[Portfolio URL] | [LinkedIn] | [Email]
 """,
 }
 # ===============================================
