@@ -1,0 +1,17 @@
+# Cold Mailer Pro – Python Standard Library only
+# No third-party packages required.
+#
+# Built-in modules used:
+#   tkinter       – GUI framework (install python3-tk on Linux)
+#   csv           – CSV parsing
+#   smtplib       – SMTP email sending
+#   email         – MIME message construction
+#   threading     – Non-blocking UI / background send
+#   time          – Rate-limit delay between emails
+#   os            – File path utilities
+#
+# Requirements:
+#   Python >= 3.8
+#
+# On Ubuntu / Debian, ensure tkinter is available:
+#   sudo apt-get install python3-tk

@@ -1,162 +1,172 @@
-# 📧 Cold Mailer (Python + Tkinter)
+# 📧 Cold Mailer Pro
 
-A **desktop-based bulk email sender** built using **Python and Tkinter**.  
-It allows users to load HR contact data from a CSV file and send personalized cold emails safely with **anti-spam features**, **pause/resume**, **progress tracking**, and **attachment support**.
+A **desktop bulk email sender** built with **Python and Tkinter** — no external dependencies required.  
+Load contacts from a CSV file, pick a professional template, and send personalized cold emails with built-in anti-spam pacing, pause/resume controls, attachment support, and a real-time log.
+
+![Cold Mailer Pro UI](cold_mailer_ui.png)
+
+---
 
 ## 🚀 Features
 
-### ✅ Core Features
-- Load HR **name & email** from CSV
-- Custom **email subject & body**
-- `{name}` placeholder personalization
-- Pre-configured cold email templates
-- Attachment support (PDF, DOCX, etc.)
+### ✉️ Email Composition
+- Sender credentials (email + App Password) entered in-app — nothing is hard-coded
+- Custom **Subject** line
+- **Email Body** with `{name}` placeholder for per-recipient personalization
+- 5 ready-to-use **templates** selectable from a dropdown:
+  - Entry Level
+  - General Cold Mail
+  - Follow Up
+  - Internship
+  - Freelance
+- **Apply Template** button populates the body in one click
+- Optional **file attachment** (PDF, DOCX, or any file type)
+
+### 📋 Contact Management
+- Load contacts from any **CSV file** with `name` and `email` columns
+- Automatic validation — malformed or incomplete rows are silently skipped
+- Displays the count of valid contacts loaded
 
 ### 🛡️ Anti-Spam & Safety
-- Rate limiting (delay between emails)
-- Send limit (e.g. 100 / 200 / all)
-- Gmail-safe bulk sending
-- Graceful error handling (no crash)
+- **Configurable delay** between emails (minimum 1 second; default 5 s)
+- **Send limit** caps total recipients per session (≤ 200/day recommended for Gmail)
+- Per-recipient error isolation — a failed send logs the error and continues
+- SMTP authentication error is caught and reported clearly
+- 30-second SMTP connection timeout prevents indefinite hangs
 
-### ⏯️ Controls
-- Start sending
-- Pause sending
-- Resume from same position
-- No duplicate emails
+### ⏯️ Send Controls
+- **SEND** — starts a background thread; UI stays responsive
+- **PAUSE** — suspends sending between emails without dropping the connection
+- **RESUME** — continues from exactly where it was paused
+- **Clear Log** — wipes the activity log without interrupting sending
 
-### 📊 UI Enhancements
-- Dark mode UI
-- Real-time logs
-- Progress bar (emails sent / total)
-- Responsive & non-blocking UI (threaded)
+### 📊 Progress & Logging
+- **Progress bar** tracks `sent / total` in real time
+- **Progress label** shows the numeric count
+- **Activity log** (read-only, auto-scrolling) records every success `✔` and failure `✖`
+- Completion dialog and `✅ All emails processed` log entry when done
 
 ---
 
 ## 🖥️ Tech Stack
 
-- **Language:** Python 3.8+
-- **GUI:** Tkinter
-- **Email:** SMTP (Gmail supported)
-- **CSV Handling:** csv module
-- **Threading:** threading module
+| Layer        | Technology                          |
+|-------------|--------------------------------------|
+| Language     | Python 3.8+                         |
+| GUI          | Tkinter + ttk                       |
+| Email        | smtplib (SMTP / STARTTLS)           |
+| MIME         | email.mime (text, multipart, base)  |
+| CSV parsing  | csv.DictReader                      |
+| Concurrency  | threading.Thread + threading.Event  |
 
-➡️ Uses **only Python standard library**  
-➡️ No external dependencies
+> **No third-party packages required** — pure Python standard library.
 
 ---
 
 ## 📂 Project Structure
 
 ```
-
-cold_mailer_pro/
-│
-├── cold_mailer_pro.py
-├── requirements.txt
+Cold-Mailer/
+├── cold_mailer_pro.py   # Single-file application
+├── requirements.txt     # Documents stdlib dependencies & Python version
+├── cold_mailer_ui.png   # UI screenshot
+├── hr_contact.csv       # Sample contact list
 └── README.md
-
-````
+```
 
 ---
 
-## 📄 CSV File Format (Required)
+## 📄 CSV File Format
 
-Your CSV file **must** contain the following headers:
+Your CSV file **must** have `name` and `email` column headers (case-sensitive).  
+Rows with a missing name or invalid email address are skipped automatically.
 
 ```csv
 name,email
-Rahul Sharma,rahul@gmail.com
+Rahul Sharma,rahul@example.com
 Anita Verma,anita@company.com
-````
+```
 
 ---
 
-## 🔐 Email Setup (Gmail)
+## 🔐 Gmail Setup
 
-To use Gmail SMTP:
+Cold Mailer Pro uses **SMTP with STARTTLS** on port 587.  
+For Gmail you must use an **App Password** — your regular password will not work.
 
-1. Enable **2-Step Verification**
-2. Generate **App Password**
-3. Use App Password in code
+1. Enable **2-Step Verification** on your Google Account
+2. Go to **Google Account → Security → App Passwords**
+3. Generate a 16-character App Password
+4. Enter it in the **App Password** field in the app
 
-```python
-SENDER_EMAIL = "your_email@gmail.com"
-SENDER_PASSWORD = "your_app_password"
-```
+> ❌ Never enter your real Gmail password.
 
-❌ Do NOT use your normal Gmail password
+Other SMTP providers (Outlook, Yahoo, custom mail servers) can be used by editing the `SMTP_SERVER` and `SMTP_PORT` constants at the top of `cold_mailer_pro.py`.
 
 ---
 
 ## ▶️ How to Run
 
-### 1️⃣ Install Python
-
-Make sure Python **3.8 or above** is installed.
+### 1. Install Python 3.8+
 
 ```bash
-python --version
+python3 --version
 ```
 
-### 2️⃣ Run the Application
+### 2. Install tkinter (Linux only)
+
+Tkinter ships with Python on Windows and macOS. On Ubuntu/Debian:
 
 ```bash
-python cold_mailer_pro.py
+sudo apt-get install python3-tk
+```
+
+### 3. Launch the app
+
+```bash
+python3 cold_mailer_pro.py
 ```
 
 ---
 
-## 🧪 How It Works
+## 🧪 Workflow
 
-1. Load CSV file
-2. Choose template or write custom email
-3. Set subject, body, delay & send limit
-4. (Optional) Add attachment
-5. Click **SEND**
-6. Pause / Resume anytime
-7. Track progress via progress bar
-
----
-
-## 📊 Anti-Spam Best Practices (Built-in)
-
-| Feature              | Status |
-| -------------------- | ------ |
-| Rate limiting        | ✅      |
-| Daily send limit     | ✅      |
-| Personalization      | ✅      |
-| Error isolation      | ✅      |
-| UI freeze protection | ✅      |
-
-Recommended:
-
-* Delay ≥ 5 seconds
-* ≤ 200 emails/day (Gmail safe)
+1. **Enter** your sender email and Gmail App Password
+2. **Load CSV** — pick a file with `name,email` columns
+3. **Select a template** and click **Apply Template** (or type your own body)
+4. **Fill in** the Subject line
+5. *(Optional)* Click **Add Attachment** to attach a file
+6. **Set** Send Limit and Delay (defaults: all contacts, 5 s delay)
+7. Click **SEND** — watch the log and progress bar
+8. Use **PAUSE / RESUME** anytime during sending
 
 ---
 
-## 🛠️ Customization Ideas
+## 📊 Anti-Spam Quick Reference
 
-You can extend this project with:
+| Feature                  | Status  | Default         |
+|--------------------------|---------|-----------------|
+| Delay between emails     | ✅      | 5 seconds       |
+| Configurable send limit  | ✅      | All loaded rows |
+| Per-recipient isolation  | ✅      | Always on       |
+| Non-blocking UI          | ✅      | Always on       |
+| SMTP timeout             | ✅      | 30 seconds      |
+| Pause / Resume           | ✅      | Available       |
 
-* HTML email templates
-* Resume auto-attach per row
-* OAuth2 (password-less Gmail login)
-* Email open tracking
-* Convert to `.exe` using PyInstaller
-* ETA (time remaining)
-* Sent / Failed counters
+**Recommended settings for Gmail:**
+- Delay ≥ 5 seconds
+- ≤ 200 emails per day
 
 ---
 
 ## 📜 License
 
-This project is created for **educational and personal use**.
-Use responsibly and follow email outreach laws and policies.
+For **educational and personal use**.  
+Use responsibly and comply with applicable email outreach laws and platform policies.
 
 ---
 
 ## 👤 Author
 
-Developed by **Saksham Shekher**
-MCA | Python | Web | Cloud | DevOps Enthusiast
+Developed by **Saksham Shekher**  
+MCA · Python · Web · Cloud · DevOps
