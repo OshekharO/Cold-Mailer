@@ -101,7 +101,7 @@ For Gmail you must use an **App Password** — your regular password will not wo
 
 > ❌ Never enter your real Gmail password.
 
-Other SMTP providers (Outlook, Yahoo, custom mail servers) can be used by editing the `SMTP_SERVER` and `SMTP_PORT` constants at the top of `cold_mailer_pro.py`.
+Other SMTP providers (Outlook, custom mail servers) can be used by editing the `SMTP_SERVER` and `SMTP_PORT` constants at the top of `cold_mailer_pro.py`. The current implementation uses **STARTTLS** (port 587), so the provider must support STARTTLS/PLAIN submission. Providers that only offer implicit TLS on port 465 (`SMTP_SSL`) are not compatible without code changes.
 
 ---
 

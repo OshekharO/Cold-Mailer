@@ -10,6 +10,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from email.utils import parseaddr
+from typing import Optional
 
 # ================= SMTP CONFIG =================
 SMTP_SERVER = "smtp.gmail.com"
@@ -131,7 +132,7 @@ class ColdMailerApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.email_list: list = []
-        self.attachment_path: str | None = None
+        self.attachment_path: Optional[str] = None
 
         # threading.Event lets pause/resume work without busy-waiting
         self._pause_event = threading.Event()
