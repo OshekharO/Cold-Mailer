@@ -54,7 +54,7 @@ Load contacts from a CSV file, pick a professional template, and send personaliz
 |-------------|--------------------------------------|
 | Language     | Python 3.8+                         |
 | GUI          | Tkinter + ttk                       |
-| Email        | smtplib (SMTP / STARTTLS)           |
+| Email        | smtplib (SMTP with STARTTLS)        |
 | MIME         | email.mime (text, multipart, base)  |
 | CSV parsing  | csv.DictReader                      |
 | Concurrency  | threading.Thread + threading.Event  |
