@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox, ttk
 import csv
 import smtplib
 import time
+import base64
 import os
 import threading
 from email.mime.text import MIMEText
@@ -278,6 +279,19 @@ class ColdMailerApp:
         with self._lock:
             self.sending = True
 
+        # BOLT OPTIMIZATION: Pre-read and base64-encode the attachment file ONCE before the loop.
+        # This avoids redundant disk I/O and CPU-intensive base64 encoding for every recipient email.
+        cached_attachment_payload: Optional[str] = None
+        cached_attachment_filename: Optional[str] = None
+        if self.attachment_path:
+            try:
+                with open(self.attachment_path, "rb") as f:
+                    cached_attachment_payload = base64.b64encode(f.read()).decode("ascii")
+                cached_attachment_filename = os.path.basename(self.attachment_path)
+            except Exception as e:
+                self._dialog("error", "Attachment Error", f"Failed to read attachment file: {e}")
+                return
+
         server = None
         completed = False
         try:
@@ -302,14 +316,13 @@ class ColdMailerApp:
 
                     msg.attach(MIMEText(personalized_body, "plain"))
 
-                    if self.attachment_path:
-                        with open(self.attachment_path, "rb") as f:
-                            part = MIMEBase("application", "octet-stream")
-                            part.set_payload(f.read())
-                        encoders.encode_base64(part)
+                    if cached_attachment_payload and cached_attachment_filename:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(cached_attachment_payload)
+                        part["Content-Transfer-Encoding"] = "base64"
                         part.add_header(
                             "Content-Disposition",
-                            f'attachment; filename="{os.path.basename(self.attachment_path)}"',
+                            f'attachment; filename="{cached_attachment_filename}"',
                         )
                         msg.attach(part)
 
