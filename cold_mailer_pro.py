@@ -198,6 +198,15 @@ class ColdMailerApp:
 
     # ── Attachment ────────────────────────────────────────────────────────────
 
+    def toggle_password_visibility(self) -> None:
+        """Toggle App Password entry visibility between hidden and plain text."""
+        if self.password_entry.cget("show") == "•":
+            self.password_entry.config(show="")
+            self.toggle_pass_btn.config(text="🙈 Hide")
+        else:
+            self.password_entry.config(show="•")
+            self.toggle_pass_btn.config(text="👁 Show")
+
     def select_attachment(self) -> None:
         path = filedialog.askopenfilename()
         if path:
@@ -462,13 +471,33 @@ class ColdMailerApp:
         )
         self.email_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
 
+        pass_frame = tk.Frame(creds_frame, bg=surface)
+        pass_frame.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
+
         self.password_entry = tk.Entry(
-            creds_frame,
+            pass_frame,
             bg=entry_bg, fg=fg, relief="flat",
             insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
             show="•",
         )
-        self.password_entry.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
+        self.password_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        self.toggle_pass_btn = tk.Button(
+            pass_frame,
+            text="👁 Show",
+            command=self.toggle_password_visibility,
+            bg="#2a2f36",
+            fg=fg,
+            activebackground="#2a2f36",
+            activeforeground=fg,
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=4,
+            font=("Segoe UI", 9),
+            cursor="hand2",
+        )
+        self.toggle_pass_btn.pack(side=tk.RIGHT, padx=(6, 0))
 
         creds_frame.columnconfigure(0, weight=1)
         creds_frame.columnconfigure(1, weight=1)

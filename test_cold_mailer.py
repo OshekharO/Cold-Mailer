@@ -16,5 +16,27 @@ class TestEmailValidation(unittest.TestCase):
         self.assertEqual(parse_and_validate_email("user@.com"), "")
         self.assertEqual(parse_and_validate_email("user@com"), "")
 
+class TestPasswordVisibilityToggle(unittest.TestCase):
+    def test_toggle_password_visibility(self):
+        import tkinter as tk
+        root = tk.Tk()
+        app = ColdMailerApp(root)
+
+        # Initial state should be hidden with bullet character
+        self.assertEqual(app.password_entry.cget("show"), "•")
+        self.assertEqual(app.toggle_pass_btn.cget("text"), "👁 Show")
+
+        # Toggle once -> visible
+        app.toggle_password_visibility()
+        self.assertEqual(app.password_entry.cget("show"), "")
+        self.assertEqual(app.toggle_pass_btn.cget("text"), "🙈 Hide")
+
+        # Toggle twice -> hidden
+        app.toggle_password_visibility()
+        self.assertEqual(app.password_entry.cget("show"), "•")
+        self.assertEqual(app.toggle_pass_btn.cget("text"), "👁 Show")
+
+        root.destroy()
+
 if __name__ == "__main__":
     unittest.main()
