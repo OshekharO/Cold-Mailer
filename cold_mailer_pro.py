@@ -192,6 +192,11 @@ class ColdMailerApp:
                     if name and addr:
                         loaded.append({"name": name, "email": addr})
             self.email_list = loaded
+            if hasattr(self, "csv_status_lbl"):
+                self.csv_status_lbl.config(
+                    text=f"✓ Loaded {len(self.email_list)} contacts ({os.path.basename(path)})",
+                    fg="#25c46f",
+                )
             self.log(f"📄 Loaded {len(self.email_list)} contacts\n")
         except Exception as e:
             messagebox.showerror("CSV Error", str(e))
@@ -211,7 +216,26 @@ class ColdMailerApp:
         path = filedialog.askopenfilename()
         if path:
             self.attachment_path = path
-            self.log(f"📎 Attachment: {os.path.basename(path)}\n")
+            filename = os.path.basename(path)
+            if hasattr(self, "attachment_status_lbl"):
+                self.attachment_status_lbl.config(
+                    text=f"📎 {filename}",
+                    fg="#3b82f6",
+                )
+            if hasattr(self, "clear_att_btn"):
+                self.clear_att_btn.pack(side=tk.LEFT, padx=(4, 0))
+            self.log(f"📎 Attachment: {filename}\n")
+
+    def clear_attachment(self) -> None:
+        self.attachment_path = None
+        if hasattr(self, "attachment_status_lbl"):
+            self.attachment_status_lbl.config(
+                text="No file attached",
+                fg="#6b7280",
+            )
+        if hasattr(self, "clear_att_btn"):
+            self.clear_att_btn.pack_forget()
+        self.log("📎 Attachment cleared\n")
 
     # ── Template ─────────────────────────────────────────────────────────────
 
@@ -385,233 +409,388 @@ class ColdMailerApp:
     def _build_ui(self) -> None:
         root = self.root
         root.title("Cold Mailer Pro")
-        root.geometry("980x920")
+        root.geometry("1000x950")
 
-        fg = "#f5f5f5"
-        bg = "#0f1115"
-        surface = "#1c1f26"
-        entry_bg = "#12151c"
-        muted = "#b7bec9"
-        accent = "#4fa8f4"
-        accent_secondary = "#25c46f"
+        fg = "#f8fafc"
+        bg = "#0f172a"
+        card_bg = "#1e293b"
+        card_border = "#334155"
+        entry_bg = "#0f172a"
+        entry_border = "#475569"
+        muted = "#94a3b8"
+        accent = "#38bdf8"
+        accent_hover = "#0284c7"
+        accent_secondary = "#22c55e"
+        accent_secondary_hover = "#16a34a"
 
         root.configure(bg=bg)
         root.option_add("*Font", ("Segoe UI", 10))
-        root.minsize(760, 740)
+        root.minsize(800, 780)
 
+        # Apply dark styling to ttk widgets
         style = ttk.Style()
         style.theme_use("default")
+
         style.configure(
             "TProgressbar",
-            troughcolor="#0c0f14",
+            troughcolor="#0f172a",
             background=accent,
             bordercolor=bg,
             lightcolor=accent,
             darkcolor=accent,
         )
 
-        tk.Label(
-            root,
-            text="Cold Mail Sender – Anti-Spam Enabled",
+        style.configure(
+            "TCombobox",
+            fieldbackground=entry_bg,
+            background=card_bg,
+            foreground=fg,
+            darkcolor=card_bg,
+            lightcolor=card_bg,
+            arrowcolor=fg,
+            bordercolor=entry_border,
+            insertcolor=fg,
+            padding=6,
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", entry_bg)],
+            foreground=[("readonly", fg)],
+        )
+
+        root.option_add("*TCombobox*Listbox.background", entry_bg)
+        root.option_add("*TCombobox*Listbox.foreground", fg)
+        root.option_add("*TCombobox*Listbox.selectBackground", accent_hover)
+        root.option_add("*TCombobox*Listbox.selectForeground", fg)
+
+        # Top Header Banner
+        header = tk.Frame(root, bg=bg, padx=20, pady=12)
+        header.pack(fill=tk.X)
+
+        title_lbl = tk.Label(
+            header,
+            text="Cold Mailer Pro",
             fg=fg,
             bg=bg,
-            font=("Segoe UI Semibold", 18, "bold"),
-        ).pack(pady=(18, 2))
+            font=("Segoe UI Semibold", 20, "bold"),
+        )
+        title_lbl.pack(anchor="w")
 
-        tk.Label(
-            root,
-            text="Automated outreach with pacing, templates, and attachment support",
+        subtitle_lbl = tk.Label(
+            header,
+            text="Automated outreach with anti-spam pacing, templates, and real-time logs",
             fg=muted,
             bg=bg,
             font=("Segoe UI", 10),
-        ).pack(pady=(0, 12))
-
-        card = tk.Frame(
-            root,
-            bg=surface,
-            bd=0,
-            highlightbackground="#2a2f36",
-            highlightthickness=1,
-            padx=18,
-            pady=18,
         )
-        card.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        subtitle_lbl.pack(anchor="w", pady=(2, 0))
 
-        def lbl(text, parent=None, **kw):
-            return tk.Label(parent or card, text=text, fg=fg, bg=surface, anchor="w", **kw)
+        # Main Scrollable / Padding Container Frame
+        main_container = tk.Frame(root, bg=bg, padx=20, pady=0)
+        main_container.pack(fill=tk.BOTH, expand=True)
 
-        def btn(parent, text, command, color=accent):
-            return tk.Button(
+        def create_card(parent, title_text):
+            card = tk.Frame(
+                parent,
+                bg=card_bg,
+                bd=0,
+                highlightbackground=card_border,
+                highlightthickness=1,
+                padx=16,
+                pady=14,
+            )
+            card.pack(fill=tk.X, pady=(0, 12))
+
+            header_lbl = tk.Label(
+                card,
+                text=title_text,
+                fg=fg,
+                bg=card_bg,
+                font=("Segoe UI Semibold", 11, "bold"),
+                anchor="w",
+            )
+            header_lbl.pack(fill=tk.X, pady=(0, 10))
+            return card
+
+        def lbl(text, parent, **kw):
+            return tk.Label(parent, text=text, fg=muted, bg=card_bg, font=("Segoe UI", 9, "bold"), anchor="w", **kw)
+
+        def create_entry(parent, show=None, width=None):
+            kw = {}
+            if show:
+                kw["show"] = show
+            if width:
+                kw["width"] = width
+            return tk.Entry(
+                parent,
+                bg=entry_bg,
+                fg=fg,
+                relief="flat",
+                insertbackground=fg,
+                highlightthickness=1,
+                highlightbackground=entry_border,
+                highlightcolor=accent,
+                font=("Segoe UI", 10),
+                **kw,
+            )
+
+        def btn(parent, text, command, color=accent, hover_color=accent_hover, fg_color=fg, padx=12, pady=6):
+            b = tk.Button(
                 parent,
                 text=text,
                 command=command,
                 bg=color,
-                fg=fg,
-                activebackground=color,
-                activeforeground=fg,
+                fg=fg_color,
+                activebackground=hover_color,
+                activeforeground=fg_color,
                 relief="flat",
                 bd=0,
-                padx=14,
-                pady=8,
-                font=("Segoe UI", 10, "bold"),
+                padx=padx,
+                pady=pady,
+                font=("Segoe UI", 9, "bold"),
                 cursor="hand2",
             )
+            b.bind("<Enter>", lambda e: b.config(bg=hover_color))
+            b.bind("<Leave>", lambda e: b.config(bg=color))
+            return b
 
-        # ── Credentials ──────────────────────────────────────────────────────
-        creds_frame = tk.Frame(card, bg=surface)
-        creds_frame.pack(fill=tk.X, pady=(0, 10))
+        # ── Section 1: Sender Credentials ──────────────────────────────────
+        creds_card = create_card(main_container, "1. SENDER CREDENTIALS")
 
-        lbl("Sender Email", parent=creds_frame).grid(row=0, column=0, sticky="w")
-        lbl("App Password", parent=creds_frame).grid(row=0, column=1, sticky="w", padx=(18, 0))
+        creds_grid = tk.Frame(creds_card, bg=card_bg)
+        creds_grid.pack(fill=tk.X)
 
-        self.email_entry = tk.Entry(
-            creds_frame,
-            bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
-        )
+        lbl("Sender Email Address", creds_grid).grid(row=0, column=0, sticky="w")
+        lbl("App Password (Gmail)", creds_grid).grid(row=0, column=1, sticky="w", padx=(18, 0))
+
+        self.email_entry = create_entry(creds_grid)
         self.email_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
 
-        pass_frame = tk.Frame(creds_frame, bg=surface)
+        pass_frame = tk.Frame(creds_grid, bg=card_bg)
         pass_frame.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
 
         self.password_entry = tk.Entry(
             pass_frame,
-            bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+            bg=entry_bg,
+            fg=fg,
+            relief="flat",
+            insertbackground=fg,
+            highlightthickness=1,
+            highlightbackground=entry_border,
+            highlightcolor=accent,
+            font=("Segoe UI", 10),
             show="•",
         )
         self.password_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self.toggle_pass_btn = tk.Button(
+        self.toggle_pass_btn = btn(
             pass_frame,
             text="👁 Show",
             command=self.toggle_password_visibility,
-            bg="#2a2f36",
-            fg=fg,
-            activebackground="#2a2f36",
-            activeforeground=fg,
-            relief="flat",
-            bd=0,
-            padx=8,
+            color="#334155",
+            hover_color="#475569",
+            padx=10,
             pady=4,
-            font=("Segoe UI", 9),
-            cursor="hand2",
         )
         self.toggle_pass_btn.pack(side=tk.RIGHT, padx=(6, 0))
 
-        creds_frame.columnconfigure(0, weight=1)
-        creds_frame.columnconfigure(1, weight=1)
+        creds_grid.columnconfigure(0, weight=1)
+        creds_grid.columnconfigure(1, weight=1)
 
-        # ── CSV / Attachment ─────────────────────────────────────────────────
-        top_actions = tk.Frame(card, bg=surface)
-        top_actions.pack(fill=tk.X)
+        # ── Section 2: Campaign Contacts & File Attachments ────────────────
+        files_card = create_card(main_container, "2. RECIPIENTS & ATTACHMENT")
 
-        btn(top_actions, "Load CSV", self.load_csv).pack(side=tk.LEFT, padx=(0, 8))
-        btn(top_actions, "Add Attachment", self.select_attachment, color="#3b82f6").pack(side=tk.LEFT)
+        files_frame = tk.Frame(files_card, bg=card_bg)
+        files_frame.pack(fill=tk.X)
 
-        # ── Template ─────────────────────────────────────────────────────────
-        lbl("Template").pack(pady=(14, 4), fill=tk.X)
-        self.template_var = tk.StringVar(value="Entry Level")
-        dropdown = tk.OptionMenu(card, self.template_var, *TEMPLATES.keys())
-        dropdown.config(bg=entry_bg, fg=fg, activebackground=entry_bg, activeforeground=fg, relief="flat")
-        dropdown["menu"].config(bg=entry_bg, fg=fg, activebackground=accent, activeforeground=fg)
-        dropdown.pack(fill=tk.X)
-        btn(card, "Apply Template", self.apply_template, color="#64748b").pack(pady=(6, 12), fill=tk.X)
+        # CSV Box
+        csv_box = tk.Frame(files_frame, bg=entry_bg, highlightthickness=1, highlightbackground=entry_border, padx=12, pady=10)
+        csv_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
-        # ── Subject ──────────────────────────────────────────────────────────
-        lbl("Subject").pack(pady=(4, 4), fill=tk.X)
-        self.subject_entry = tk.Entry(
-            card, width=95,
-            bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
+        csv_btn_row = tk.Frame(csv_box, bg=entry_bg)
+        csv_btn_row.pack(fill=tk.X)
+
+        btn(csv_btn_row, "📁 Load Contacts CSV", self.load_csv, color="#0284c7", hover_color="#0369a1").pack(side=tk.LEFT)
+
+        self.csv_status_lbl = tk.Label(
+            csv_box,
+            text="No CSV file loaded",
+            fg=muted,
+            bg=entry_bg,
+            font=("Segoe UI", 9),
+            anchor="w",
         )
-        self.subject_entry.pack(fill=tk.X)
+        self.csv_status_lbl.pack(fill=tk.X, pady=(6, 0))
 
-        # ── Body ─────────────────────────────────────────────────────────────
-        lbl("Email Body ({name} supported)").pack(pady=(10, 4), fill=tk.X)
-        body_frame = tk.Frame(card, bg=entry_bg, highlightthickness=1, highlightbackground="#2f3440")
-        body_frame.pack(fill=tk.BOTH)
-        body_scroll = tk.Scrollbar(body_frame, bg=surface, troughcolor=entry_bg, relief="flat", bd=0)
+        # Attachment Box
+        att_box = tk.Frame(files_frame, bg=entry_bg, highlightthickness=1, highlightbackground=entry_border, padx=12, pady=10)
+        att_box.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(8, 0))
+
+        att_btn_row = tk.Frame(att_box, bg=entry_bg)
+        att_btn_row.pack(fill=tk.X)
+
+        btn(att_btn_row, "📎 Add Attachment", self.select_attachment, color="#475569", hover_color="#64748b").pack(side=tk.LEFT)
+
+        self.clear_att_btn = btn(
+            att_btn_row,
+            text="✖ Clear",
+            command=self.clear_attachment,
+            color="#ef4444",
+            hover_color="#dc2626",
+            padx=8,
+            pady=4,
+        )
+        # Hidden by default until an attachment is selected
+
+        self.attachment_status_lbl = tk.Label(
+            att_box,
+            text="No file attached",
+            fg=muted,
+            bg=entry_bg,
+            font=("Segoe UI", 9),
+            anchor="w",
+        )
+        self.attachment_status_lbl.pack(fill=tk.X, pady=(6, 0))
+
+        # ── Section 3: Email Composer ───────────────────────────────────────
+        composer_card = create_card(main_container, "3. EMAIL COMPOSER")
+
+        # Template Picker
+        tmpl_frame = tk.Frame(composer_card, bg=card_bg)
+        tmpl_frame.pack(fill=tk.X, pady=(0, 8))
+
+        lbl("Select Template", tmpl_frame).grid(row=0, column=0, sticky="w")
+
+        self.template_var = tk.StringVar(value="Entry Level")
+        self.template_combo = ttk.Combobox(
+            tmpl_frame,
+            textvariable=self.template_var,
+            values=list(TEMPLATES.keys()),
+            state="readonly",
+        )
+        self.template_combo.grid(row=1, column=0, sticky="we", pady=(4, 0))
+
+        apply_btn = btn(tmpl_frame, "Apply Template", self.apply_template, color="#475569", hover_color="#64748b")
+        apply_btn.grid(row=1, column=1, padx=(12, 0), pady=(4, 0), sticky="e")
+
+        tmpl_frame.columnconfigure(0, weight=1)
+
+        # Subject Line
+        lbl("Subject Line", composer_card).pack(fill=tk.X, pady=(4, 2))
+        self.subject_entry = create_entry(composer_card)
+        self.subject_entry.pack(fill=tk.X, pady=(0, 8))
+
+        # Email Body
+        lbl("Email Body (Supports {name} placeholders)", composer_card).pack(fill=tk.X, pady=(4, 2))
+
+        body_frame = tk.Frame(composer_card, bg=entry_bg, highlightthickness=1, highlightbackground=entry_border)
+        body_frame.pack(fill=tk.BOTH, expand=True)
+
+        body_scroll = tk.Scrollbar(body_frame, bg=card_bg, troughcolor=entry_bg, relief="flat", bd=0)
         body_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
         self.body_text = tk.Text(
-            body_frame, height=10, width=100,
-            bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=0,
+            body_frame,
+            height=7,
+            bg=entry_bg,
+            fg=fg,
+            relief="flat",
+            insertbackground=fg,
+            highlightthickness=0,
+            font=("Consolas", 10),
             yscrollcommand=body_scroll.set,
         )
-        self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.body_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=6, pady=6)
         body_scroll.config(command=self.body_text.yview)
 
-        # ── Options ──────────────────────────────────────────────────────────
-        options_frame = tk.Frame(card, bg=surface)
-        options_frame.pack(fill=tk.X, pady=(12, 4))
+        # ── Section 4: Campaign Options & Controls ──────────────────────────
+        opts_card = create_card(main_container, "4. SENDING PACING & ACTIONS")
 
-        lbl("Send Limit (≤200 recommended)", parent=options_frame).grid(row=0, column=0, sticky="w")
-        lbl("Delay Between Emails (seconds, min 1)", parent=options_frame).grid(row=0, column=1, sticky="w", padx=(18, 0))
+        opts_grid = tk.Frame(opts_card, bg=card_bg)
+        opts_grid.pack(fill=tk.X, pady=(0, 10))
 
-        self.limit_entry = tk.Entry(
-            options_frame,
-            bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
-        )
+        lbl("Send Limit (≤200 recommended for Gmail)", opts_grid).grid(row=0, column=0, sticky="w")
+        lbl("Delay Between Emails (seconds, min 1s)", opts_grid).grid(row=0, column=1, sticky="w", padx=(18, 0))
+
+        self.limit_entry = create_entry(opts_grid)
         self.limit_entry.grid(row=1, column=0, sticky="we", pady=(4, 0))
 
-        self.delay_entry = tk.Entry(
-            options_frame,
-            bg=entry_bg, fg=fg, relief="flat",
-            insertbackground=fg, highlightthickness=1, highlightbackground="#2f3440",
-        )
+        self.delay_entry = create_entry(opts_grid)
         self.delay_entry.insert(0, "5")
         self.delay_entry.grid(row=1, column=1, sticky="we", padx=(18, 0), pady=(4, 0))
 
-        options_frame.columnconfigure(0, weight=1)
-        options_frame.columnconfigure(1, weight=1)
+        opts_grid.columnconfigure(0, weight=1)
+        opts_grid.columnconfigure(1, weight=1)
 
-        # ── Action buttons ────────────────────────────────────────────────────
-        btn_frame = tk.Frame(card, bg=surface)
-        btn_frame.pack(pady=12, fill=tk.X)
+        # Action Buttons
+        btn_frame = tk.Frame(opts_card, bg=card_bg)
+        btn_frame.pack(fill=tk.X, pady=(4, 0))
 
-        btn(btn_frame, "SEND", self.start_sending, color=accent_secondary).grid(row=0, column=0, padx=5, sticky="we")
-        btn(btn_frame, "PAUSE", self.pause_sending, color="#f59e0b").grid(row=0, column=1, padx=5, sticky="we")
-        btn(btn_frame, "RESUME", self.resume_sending, color="#3b82f6").grid(row=0, column=2, padx=5, sticky="we")
+        btn(btn_frame, "▶ START SENDING", self.start_sending, color=accent_secondary, hover_color=accent_secondary_hover, pady=8).grid(
+            row=0, column=0, padx=(0, 6), sticky="we"
+        )
+        btn(btn_frame, "⏸ PAUSE", self.pause_sending, color="#f59e0b", hover_color="#d97706", pady=8).grid(
+            row=0, column=1, padx=6, sticky="we"
+        )
+        btn(btn_frame, "▶ RESUME", self.resume_sending, color="#3b82f6", hover_color="#2563eb", pady=8).grid(
+            row=0, column=2, padx=(6, 0), sticky="we"
+        )
 
         btn_frame.columnconfigure(0, weight=1)
         btn_frame.columnconfigure(1, weight=1)
         btn_frame.columnconfigure(2, weight=1)
 
-        # ── Progress bar ──────────────────────────────────────────────────────
-        prog_header = tk.Frame(card, bg=surface)
-        prog_header.pack(fill=tk.X)
-        self.progress_label = tk.Label(prog_header, text="Progress: 0 / 0", fg=muted, bg=surface, anchor="w")
+        # ── Section 5: Progress & Real-time Activity Log ────────────────────
+        log_card = create_card(main_container, "5. PROGRESS & ACTIVITY LOG")
+
+        prog_header = tk.Frame(log_card, bg=card_bg)
+        prog_header.pack(fill=tk.X, pady=(0, 4))
+
+        self.progress_label = tk.Label(
+            prog_header,
+            text="Progress: 0 / 0",
+            fg=fg,
+            bg=card_bg,
+            font=("Segoe UI Semibold", 10),
+            anchor="w",
+        )
         self.progress_label.pack(side=tk.LEFT)
-        btn(prog_header, "Clear Log", self._clear_log, color="#374151").pack(side=tk.RIGHT)
 
-        self.progress = ttk.Progressbar(card, orient="horizontal", length=750, mode="determinate")
-        self.progress.pack(fill=tk.X, pady=6)
+        btn(prog_header, "Clear Log", self._clear_log, color="#334155", hover_color="#475569", padx=10, pady=4).pack(side=tk.RIGHT)
 
-        # ── Log ───────────────────────────────────────────────────────────────
-        log_frame = tk.Frame(card, bg="#0e1117", highlightthickness=1, highlightbackground="#2f3440")
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=(2, 0))
-        log_scroll = tk.Scrollbar(log_frame, bg=surface, troughcolor="#0e1117", relief="flat", bd=0)
+        self.progress = ttk.Progressbar(log_card, orient="horizontal", mode="determinate")
+        self.progress.pack(fill=tk.X, pady=(2, 10))
+
+        log_frame = tk.Frame(log_card, bg="#020617", highlightthickness=1, highlightbackground=entry_border)
+        log_frame.pack(fill=tk.BOTH, expand=True)
+
+        log_scroll = tk.Scrollbar(log_frame, bg=card_bg, troughcolor="#020617", relief="flat", bd=0)
         log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
         self.log_box = tk.Text(
-            log_frame, height=12,
-            bg="#0e1117", fg="#8afac9", relief="flat",
-            insertbackground=fg, highlightthickness=0,
+            log_frame,
+            height=7,
+            bg="#020617",
+            fg="#4ade80",
+            relief="flat",
+            insertbackground=fg,
+            highlightthickness=0,
+            font=("Consolas", 9),
             state=tk.DISABLED,
             yscrollcommand=log_scroll.set,
         )
-        self.log_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.log_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=6, pady=6)
         log_scroll.config(command=self.log_box.yview)
 
-        tk.Label(
+        # Footer
+        footer_lbl = tk.Label(
             root,
             text="Developed By Saksham Shekher",
             fg=muted,
             bg=bg,
             font=("Segoe UI", 9, "bold"),
-        ).pack(pady=(6, 14))
-
+        )
+        footer_lbl.pack(pady=(4, 10))
 
 def main() -> None:
     root = tk.Tk()
