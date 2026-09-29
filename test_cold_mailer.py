@@ -172,3 +172,48 @@ class TestTemplates(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestAttachmentsAndUIStatus(unittest.TestCase):
+    def test_select_and_clear_attachment(self):
+        import tkinter as tk
+        root = tk.Tk()
+        app = ColdMailerApp(root)
+
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".pdf") as tmp:
+            tmp.write("dummy pdf content")
+            tmp_path = tmp.name
+
+        try:
+            with patch("tkinter.filedialog.askopenfilename", return_value=tmp_path):
+                app.select_attachment()
+
+            self.assertEqual(app.attachment_path, tmp_path)
+            self.assertIn(os.path.basename(tmp_path), app.attachment_status_lbl.cget("text"))
+
+            app.clear_attachment()
+            self.assertIsNone(app.attachment_path)
+            self.assertEqual(app.attachment_status_lbl.cget("text"), "No file attached")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            root.destroy()
+
+    def test_csv_status_label_update(self):
+        import tkinter as tk
+        root = tk.Tk()
+        app = ColdMailerApp(root)
+
+        csv_content = "name,email\nAlice,alice@example.com\n"
+        with tempfile.NamedTemporaryFile(mode="w+", delete=False, suffix=".csv") as tmp:
+            tmp.write(csv_content)
+            tmp_path = tmp.name
+
+        try:
+            with patch("tkinter.filedialog.askopenfilename", return_value=tmp_path):
+                app.load_csv()
+
+            self.assertIn("Loaded 1 contacts", app.csv_status_lbl.cget("text"))
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            root.destroy()
